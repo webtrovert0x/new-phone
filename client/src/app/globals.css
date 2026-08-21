@@ -1,0 +1,732 @@
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Default (Light) Theme matching iOS */
+  --bg-color: #ffffff;
+  --text-main: #000000;
+  --text-muted: #8e8e93;
+  --text-blue: #007aff;
+  --separator: #c6c6c8;
+  --bubble-received: #e9e9eb;
+  --bubble-received-text: #000000;
+  --bubble-sent: #007aff;
+  --bubble-sent-text: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --keyboard-bg: #d1d1d6;
+  --keyboard-bar: #e5e5ea;
+  --card-bg: #ffffff;
+  --card-shadow: rgba(0, 0, 0, 0.1);
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.wallpaper-dark {
+  --bg-color: #000000;
+  --text-main: #ffffff;
+  --text-muted: #98989d;
+  --text-blue: #0a84ff;
+  --separator: #38383a;
+  --bubble-received: #262628;
+  --bubble-received-text: #ffffff;
+  --bubble-sent: #0a84ff;
+  --bubble-sent-text: #ffffff;
+  --header-bg: rgba(28, 28, 30, 0.85);
+  --keyboard-bg: #1c1c1e;
+  --keyboard-bar: #2c2c2e;
+  --card-bg: #38383a;
+  --card-shadow: rgba(0, 0, 0, 0.3);
+}
+
+.wallpaper-gradient {
+  /* A fun vaporwave spin but still looking like iOS */
+  --bg-color: #0f172a;
+  --text-main: #ffffff;
+  --text-muted: #94a3b8;
+  --text-blue: #a855f7;
+  --separator: rgba(255,255,255,0.1);
+  --bubble-received: rgba(255,255,255,0.1);
+  --bubble-received-text: #ffffff;
+  --bubble-sent: linear-gradient(135deg, #a855f7, #ec4899);
+  --bubble-sent-text: #ffffff;
+  --header-bg: rgba(15, 23, 42, 0.85);
+  --keyboard-bg: #1e1b4b;
+  --keyboard-bar: rgba(0,0,0,0.3);
+  --card-bg: rgba(255,255,255,0.1);
+  --card-shadow: rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: #e5e5ea;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+}
+
+/* 
+ * 1. THE PHYSICAL PHONE MOCKUP
+ */
+.phone-bezel {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: radial-gradient(circle at center, #d1d1d6, #8e8e93);
+}
+
+.app-container {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.3s;
+}
+
+@media (min-width: 768px) {
+  .phone-bezel {
+    padding: 20px;
+  }
+  .app-container {
+    height: 90vh;
+    width: auto;
+    aspect-ratio: 9 / 19.5;
+    max-width: 430px; /* iPhone 15 Pro Max */
+    border-radius: 55px;
+    border: 12px solid #000000;
+    box-shadow: 
+      inset 0 0 0 2px #333,
+      0 30px 60px rgba(0,0,0,0.4),
+      0 0 0 1px rgba(255,255,255,0.1);
+  }
+}
+
+/* Status Bar & Dynamic Island */
+.ios-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px 0 24px;
+  height: 44px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  color: var(--text-main);
+  pointer-events: none;
+}
+
+.status-time {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  width: 54px;
+  text-align: center;
+}
+
+.dynamic-island {
+  width: 120px;
+  height: 35px;
+  background-color: #000000;
+  border-radius: 20px;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: inset 0 0 4px rgba(255,255,255,0.1);
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  justify-content: flex-end;
+}
+.status-icons svg {
+  height: 12px;
+}
+
+/* 
+ * 2. iOS SCREENS BASE 
+ */
+.ios-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 44px; /* Space for status bar */
+  overflow: hidden;
+  position: relative;
+}
+
+/* 
+ * 3. HOME SCREEN (Messages Inbox)
+ */
+.messages-inbox {
+  background-color: var(--bg-color);
+}
+
+.inbox-header {
+  padding: 10px 16px 0;
+}
+
+.inbox-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.ios-btn-text {
+  color: var(--text-blue);
+  background: none;
+  border: none;
+  font-size: 1.05rem;
+  font-weight: 400;
+  cursor: pointer;
+  padding: 0;
+}
+
+.compose-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--text-blue);
+  cursor: pointer;
+}
+
+.inbox-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 10px;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  background-color: var(--keyboard-bar);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 15px;
+}
+.search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+.search-bar input {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1.05rem;
+  color: var(--text-main);
+  width: 100%;
+}
+.search-bar input::placeholder {
+  color: var(--text-muted);
+}
+
+.inbox-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-left: 16px;
+}
+
+.inbox-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px 12px 0;
+  border-bottom: 0.5px solid var(--separator);
+  cursor: pointer;
+}
+.inbox-item:active {
+  background-color: var(--keyboard-bar);
+}
+
+.avatar {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.setup-avatar { background: #8e8e93; }
+.host-avatar { background: #34c759; }
+.join-avatar { background: #007aff; }
+.fake-avatar { background: #af52de; color: white; font-weight: 600; }
+
+.avatar svg {
+  width: 24px;
+  height: 24px;
+}
+
+.inbox-content {
+  flex: 1;
+  overflow: hidden;
+}
+
+.inbox-top-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+
+.inbox-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.inbox-time {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.inbox-preview {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inbox-chevron {
+  color: var(--separator);
+  font-size: 1.5rem;
+  margin-left: 10px;
+}
+
+/* Inline Inputs for Home Screen */
+.ios-inline-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--text-blue);
+  color: var(--text-blue);
+  font-size: 1rem;
+  padding: 4px 0;
+  outline: none;
+  width: 100%;
+  margin-top: 5px;
+}
+.ios-inline-input::placeholder {
+  color: var(--text-muted);
+}
+
+.join-input-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ios-join-btn {
+  background: var(--text-blue);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 5px;
+}
+
+.error-text {
+  color: #ff3b30;
+  font-size: 0.85rem;
+  padding: 10px 16px 0 0;
+}
+
+
+/* 
+ * 4. GAME & LOBBY CHAT VIEWS
+ */
+.ios-chat {
+  background-color: var(--bg-color);
+}
+
+.chat-header {
+  background: var(--header-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--separator);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  height: 50px;
+  position: relative;
+  z-index: 10;
+}
+
+.chat-header-back {
+  display: flex;
+  align-items: center;
+  color: var(--text-blue);
+  cursor: pointer;
+  width: 70px;
+}
+.chevron {
+  font-size: 2rem;
+  font-weight: 300;
+  margin-right: 4px;
+  margin-top: -4px;
+}
+.back-text {
+  font-size: 1.05rem;
+}
+
+.chat-header-contact {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.group-avatars {
+  margin-bottom: 2px;
+}
+.avatar-stack {
+  font-size: 1.2rem;
+  background: #c6c6c8;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-single {
+  background: #8e8e93;
+  color: white;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.chat-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.chat-name::after {
+  content: "›";
+  color: var(--separator);
+  font-size: 1rem;
+}
+.chat-subtitle {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.chat-header-right {
+  width: 70px;
+  display: flex;
+  justify-content: flex-end;
+}
+.facetime-icon, .info-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--text-blue);
+}
+
+/* Chat Messages Area */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.timestamp {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+/* System Messages (Lobby) */
+.system-message {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.system-action-box {
+  background: var(--keyboard-bar);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 20px;
+  text-align: center;
+}
+.system-action-box p {
+  font-size: 0.85rem;
+  color: var(--text-main);
+  margin-bottom: 10px;
+}
+
+.wallpaper-picker {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.wallpaper-picker button {
+  background: var(--card-bg);
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text-main);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.wallpaper-picker button.active {
+  background: var(--text-blue);
+  color: white;
+  border-color: var(--text-blue);
+}
+
+/* iMessage Bubbles */
+.imessage-row {
+  display: flex;
+  margin-bottom: 16px;
+  position: relative;
+}
+.received-row {
+  justify-content: flex-start;
+}
+.sent-row {
+  justify-content: flex-end;
+}
+
+.imessage {
+  max-width: 75%;
+  padding: 8px 14px;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  border-radius: 18px;
+  position: relative;
+  word-wrap: break-word;
+}
+
+/* The iconic iMessage tail using pseudo elements */
+.imessage::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  height: 20px;
+  width: 20px;
+  z-index: 0;
+}
+.imessage::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  height: 20px;
+  width: 10px;
+  background-color: var(--bg-color);
+  z-index: 1;
+}
+
+.received {
+  background: var(--bubble-received);
+  color: var(--bubble-received-text);
+  border-bottom-left-radius: 4px;
+}
+.received::before {
+  left: -8px;
+  background-color: var(--bubble-received);
+  border-bottom-right-radius: 15px;
+}
+.received::after {
+  left: -10px;
+  border-bottom-right-radius: 10px;
+}
+
+.sent {
+  background: var(--bubble-sent);
+  color: var(--bubble-sent-text);
+  border-bottom-right-radius: 4px;
+}
+.sent::before {
+  right: -8px;
+  background-color: var(--bubble-sent);
+  border-bottom-left-radius: 15px;
+}
+.sent::after {
+  right: -10px;
+  border-bottom-left-radius: 10px;
+}
+
+.pending {
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0;
+  font-size: 0.8rem;
+  border: none;
+}
+.pending::before, .pending::after {
+  display: none;
+}
+
+.judging-row {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.judging-row:hover {
+  opacity: 0.8;
+}
+
+/* 
+ * 5. iOS KEYBOARD / BOTTOM APP DRAWER 
+ */
+.ios-bottom-bar, .ios-keyboard-area {
+  background-color: var(--keyboard-bg);
+  padding: 10px 16px 24px 16px;
+}
+
+.ios-primary-btn {
+  width: 100%;
+  padding: 14px;
+  background-color: var(--text-blue);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ios-primary-btn:disabled {
+  opacity: 0.5;
+}
+.ios-waiting-text {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 14px 0;
+}
+
+/* Predictive Text Bar Area */
+.keyboard-predictive-bar {
+  background-color: var(--keyboard-bar);
+  margin: -10px -16px 10px -16px;
+  padding: 10px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.keyboard-hand {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+}
+.keyboard-hand::-webkit-scrollbar { display: none; }
+
+.hand-card {
+  flex: 0 0 140px;
+  height: 100px;
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 2px 6px var(--card-shadow);
+  cursor: pointer;
+  color: var(--text-main);
+}
+.hand-card:active {
+  background: var(--keyboard-bar);
+}
+
+.keyboard-status {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 20px 0;
+}
+
+/* iOS Style Modal */
+.ios-modal-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ios-modal {
+  background: var(--header-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  width: 270px;
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ios-modal-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 18px;
+  margin-bottom: 4px;
+  color: var(--text-main);
+}
+
+.ios-modal-message {
+  font-size: 0.85rem;
+  color: var(--text-main);
+  padding: 0 16px 18px 16px;
+  line-height: 1.3;
+}
+
+.ios-modal-btn {
+  border: none;
+  border-top: 0.5px solid var(--separator);
+  background: transparent;
+  color: var(--text-blue);
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 12px 0;
+  cursor: pointer;
+  width: 100%;
+}
+.ios-modal-btn:active {
+  background: var(--keyboard-bar);
+}
