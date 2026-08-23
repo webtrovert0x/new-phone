@@ -1,394 +1,451 @@
 "use client";
-
 import { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { Home, Gamepad2, Trophy, User, ArrowLeft, Settings, MessageCircleQuestion, Crown, Heart, Clock, CheckCircle } from 'lucide-react';
 
-const socket: Socket = io('http://localhost:3002');
+const socket: Socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002');
 
 // Types
 interface Player {
   id: string;
   name: string;
-  isHost: boolean;
+  avatar: string;
+  score: number;
   hand: string[];
-}
-
-interface Submission {
-  playerId: string;
-  card: string;
+  isHost: boolean;
 }
 
 interface Room {
   id: string;
-  status: 'lobby' | 'playing' | 'judging';
   players: Player[];
-  currentInbox: string;
-  submissions: Submission[];
+  status: 'lobby' | 'playing' | 'judging' | 'scoreboard';
   judgeIndex: number;
-  wallpaper: string;
+  currentInbox: string | null;
+  submissions: { playerId: string; card: string }[];
+  roundCount: number;
+  lastWinnerId: string | null;
 }
 
-// Helper components for iOS UI
-const StatusBar = () => (
-  <div className="ios-status-bar">
-    <div className="status-time">9:41</div>
-    <div className="dynamic-island"></div>
-    <div className="status-icons">
-      <svg className="icon-signal" viewBox="0 0 24 24" width="16" height="16">
-        <rect x="2" y="14" width="3.5" height="5" rx="1" fill="currentColor"/>
-        <rect x="7.5" y="11" width="3.5" height="8" rx="1" fill="currentColor"/>
-        <rect x="13" y="7" width="3.5" height="12" rx="1" fill="currentColor"/>
-        <rect x="18.5" y="3" width="3.5" height="16" rx="1" fill="currentColor"/>
-      </svg>
-      <svg className="icon-wifi" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
-        <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
-        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-        <line x1="12" y1="20" x2="12.01" y2="20"></line>
-      </svg>
-      <svg className="icon-battery" viewBox="0 0 24 24" width="24" height="14" fill="none" stroke="currentColor">
-        <rect x="2" y="6" width="18" height="12" rx="3.5" strokeWidth="1.5" />
-        <path d="M22 10.5v3" strokeWidth="2" strokeLinecap="round"/>
-        <rect x="4" y="8" width="14" height="8" rx="1.5" fill="currentColor" stroke="none" />
-      </svg>
-    </div>
-  </div>
-);
-
-interface HomeInboxProps {
-  playerName: string;
-  setPlayerName: (name: string) => void;
-  roomCode: string;
-  setRoomCode: (code: string) => void;
-  onHost: () => void;
-  onJoin: () => void;
-  error: string;
-}
-
-const HomeInbox = ({ playerName, setPlayerName, roomCode, setRoomCode, onHost, onJoin, error }: HomeInboxProps) => (
-  <div className="ios-screen messages-inbox">
-    <div className="inbox-header">
-      <div className="inbox-header-top">
-        <button className="ios-btn-text">Edit</button>
-        <svg className="compose-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-        </svg>
-      </div>
-      <h1 className="inbox-title">Messages</h1>
-      <div className="search-bar">
-        <svg className="search-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input type="text" placeholder="Search" readOnly />
-      </div>
-    </div>
-    
-    <div className="inbox-list">
-      {/* Name Input Area (Styled as a pinned contact) */}
-      <div className="inbox-item setup-item">
-        <div className="avatar setup-avatar">👤</div>
-        <div className="inbox-content">
-          <div className="inbox-name">Your Profile</div>
-          <input 
-            type="text" 
-            placeholder="Enter your name to play..." 
-            value={playerName}
-            onChange={e => setPlayerName(e.target.value)}
-            className="ios-inline-input"
-          />
-        </div>
-      </div>
-
-      {error && <div className="error-text">{error}</div>}
-
-      {/* Host Game Button */}
-      <div className="inbox-item" onClick={onHost} role="button" tabIndex={0}>
-        <div className="avatar host-avatar">
-           <svg viewBox="0 0 24 24"><path fill="white" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
-        </div>
-        <div className="inbox-content">
-          <div className="inbox-top-line">
-            <span className="inbox-name">Host a Game</span>
-            <span className="inbox-time">9:41 AM</span>
-          </div>
-          <div className="inbox-preview">Start a new room and invite friends.</div>
-        </div>
-        <div className="inbox-chevron">›</div>
-      </div>
-
-      {/* Join Game Button */}
-      <div className="inbox-item">
-        <div className="avatar join-avatar">
-           <svg viewBox="0 0 24 24"><path fill="white" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        </div>
-        <div className="inbox-content">
-          <div className="inbox-top-line">
-            <span className="inbox-name">Join a Game</span>
-            <span className="inbox-time">Yesterday</span>
-          </div>
-          <div className="inbox-preview join-input-preview">
-            <input 
-              type="text" 
-              placeholder="Enter 4-letter code..." 
-              value={roomCode}
-              onChange={e => setRoomCode(e.target.value.toUpperCase())}
-              maxLength={4}
-              className="ios-inline-input"
-            />
-            <button className="ios-join-btn" onClick={onJoin}>Join</button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Fake History */}
-      <div className="inbox-item">
-        <div className="avatar fake-avatar">M</div>
-        <div className="inbox-content">
-          <div className="inbox-top-line">
-            <span className="inbox-name">Mom</span>
-            <span className="inbox-time">Tuesday</span>
-          </div>
-          <div className="inbox-preview">New phone, who dis?</div>
-        </div>
-        <div className="inbox-chevron">›</div>
-      </div>
-
-    </div>
-  </div>
-);
-
-export default function Home() {
-  const [gameState, setGameState] = useState<'home' | 'lobby' | 'game'>('home');
+export default function App() {
   const [playerName, setPlayerName] = useState('');
-  const [roomCode, setRoomCode] = useState('');
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState('');
-  const [winnerAlert, setWinnerAlert] = useState<{ winnerName: string, card: string } | null>(null);
+  const [roomCodeInput, setRoomCodeInput] = useState('');
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [customReply, setCustomReply] = useState('');
+  
+  // local state
+  const [myPlayer, setMyPlayer] = useState<Player | null>(null);
+
+  const [isConnected, setIsConnected] = useState(socket.connected);
 
   useEffect(() => {
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
+    
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+
     socket.on('room_update', (updatedRoom: Room) => {
       setRoom(updatedRoom);
-      if (updatedRoom.status === 'lobby') setGameState('lobby');
-      else setGameState('game');
-    });
-
-    socket.on('round_winner', ({ winningSubmission, winnerName }: { winningSubmission: Submission, winnerName: string }) => {
-      setWinnerAlert({ winnerName, card: winningSubmission.card });
+      const me = updatedRoom.players.find(p => p.id === socket.id);
+      if (me) setMyPlayer(me);
     });
 
     return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.off('room_update');
-      socket.off('round_winner');
     };
   }, []);
 
-  const handleCreateRoom = () => {
+  const handleHost = () => {
+    if (!isConnected) return setError('Not connected to server yet! Try refreshing.');
     if (!playerName) return setError('Please enter your name first.');
-    socket.emit('create_room', playerName, (res: { success: boolean, roomCode?: string }) => {
-      if (res.success && res.roomCode) {
-         setRoomCode(res.roomCode);
-         setError('');
-      }
+    console.log('Requesting to create room for', playerName);
+    socket.emit('create_room', playerName, (res: any) => {
+      if (!res.success) setError('Failed to create room');
     });
   };
 
-  const handleJoinRoom = () => {
-    if (!playerName || !roomCode) return setError('Please enter name and room code.');
-    socket.emit('join_room', { roomCode, playerName }, (res: { success: boolean, message?: string }) => {
-      if (!res.success && res.message) {
-        setError(res.message);
-      } else {
-        setError('');
-      }
+  const handleJoin = () => {
+    if (!isConnected) return setError('Not connected to server yet! Try refreshing.');
+    if (!playerName) return setError('Please enter your name first.');
+    if (roomCodeInput.length !== 4) return setError('Enter 4-letter code.');
+    socket.emit('join_room', { roomCode: roomCodeInput, playerName }, (res: any) => {
+      if (!res.success) setError(res.message);
     });
   };
 
-  const startGame = () => {
-    if (room) socket.emit('start_game', room.id);
+  const handleStartGame = () => {
+    if (room && myPlayer?.isHost) {
+      socket.emit('start_game', room.id);
+    }
   };
 
-  const submitCard = (card: string) => {
-    if (room) socket.emit('submit_card', { roomCode: room.id, card });
+  const submitCard = () => {
+    const cardToSubmit = customReply.trim() ? customReply.trim() : selectedCard;
+    if (room && cardToSubmit) {
+      socket.emit('submit_card', { roomCode: room.id, card: cardToSubmit });
+      setSelectedCard(null);
+      setCustomReply('');
+    }
   };
 
-  const pickWinner = (submission: Submission) => {
-    if (room) socket.emit('pick_winner', { roomCode: room.id, winningSubmission: submission });
+  const pickWinner = (playerId: string) => {
+    if (room && myPlayer?.id === room.players[room.judgeIndex].id) {
+      const submission = room.submissions.find(s => s.playerId === playerId);
+      if (submission) {
+        socket.emit('pick_winner', { roomCode: room.id, winningSubmission: submission });
+      }
+    }
   };
 
-  const changeWallpaper = (w: string) => {
-    if (room) socket.emit('update_settings', { roomCode: room.id, settings: { wallpaper: w } });
+  const nextRound = () => {
+    if (room && myPlayer?.isHost) {
+      socket.emit('next_round', room.id);
+    }
   };
 
-  const myPlayer = room?.players.find(p => p.id === socket.id);
-  const isJudge = room && room.players[room.judgeIndex]?.id === socket.id;
-  const hasSubmitted = room?.submissions.some(s => s.playerId === socket.id);
+  const leaveRoom = () => {
+    setRoom(null);
+    socket.emit('disconnect'); 
+    window.location.reload();
+  };
 
-  return (
-    <div className="phone-bezel">
-      <div className={`app-container ${room?.wallpaper ? 'wallpaper-' + room.wallpaper : 'wallpaper-default'}`}>
-        <StatusBar />
+  // --- RENDERING ---
 
-        {winnerAlert && (
-          <div className="ios-modal-overlay">
-            <div className="ios-modal">
-              <h3 className="ios-modal-title">Round Winner!</h3>
-              <p className="ios-modal-message">
-                <strong>{winnerAlert.winnerName}</strong> won with:<br/><br/>
-                "{winnerAlert.card}"
-              </p>
-              <button className="ios-modal-btn" onClick={() => setWinnerAlert(null)}>OK</button>
+  if (!room) {
+    // HOME SCREEN
+    return (
+      <div className="app-container">
+        {/* Top Profile */}
+        <div className="top-header">
+          <div className="header-profile">
+            <img src={playerName ? `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(playerName)}` : 'https://api.dicebear.com/7.x/micah/svg?seed=Guest'} alt="Avatar" className="header-avatar" />
+            <div>
+              <div className="header-name">{playerName || 'Guest'}</div>
+              <div className="header-role">Player</div>
             </div>
           </div>
-        )}
-        
-        {gameState === 'home' && (
-          <HomeInbox 
-            playerName={playerName} 
-            setPlayerName={setPlayerName}
-            roomCode={roomCode}
-            setRoomCode={setRoomCode}
-            onHost={handleCreateRoom}
-            onJoin={handleJoinRoom}
-            error={error}
+          <div className="header-actions">
+            <button className="icon-btn"><Settings size={20} /></button>
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="hero-title">
+          <h1>Who Dis?</h1>
+          <div className="hero-bubble">
+            <MessageCircleQuestion size={30} fill="white" stroke="white" />
+          </div>
+        </div>
+        <div className="hero-subtitle">The funniest replies. Wins. 🤪</div>
+
+        {/* Input */}
+        <div className="input-group">
+          {error && <div className="error-msg">{error}</div>}
+          <input 
+            type="text" 
+            className="text-input" 
+            placeholder="Enter your name..." 
+            value={playerName} 
+            onChange={e => {setPlayerName(e.target.value); setError('');}}
           />
-        )}
+        </div>
 
-        {gameState === 'lobby' && room && (
-          <div className="ios-screen ios-chat">
-            {/* Header */}
-            <div className="chat-header">
-              <div className="chat-header-back" onClick={() => window.location.reload()}>
-                <span className="chevron">‹</span>
-                <span className="back-text">Filters</span>
-              </div>
-              <div className="chat-header-contact">
-                <div className="group-avatars">
-                  <div className="avatar-stack">👥</div>
-                </div>
-                <div className="chat-name">Room {room.id}</div>
-                <div className="chat-subtitle">{room.players.length} People</div>
-              </div>
-              <div className="chat-header-right">
-                <svg viewBox="0 0 24 24" className="info-icon" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="16" x2="12" y2="12"></line>
-                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-              </div>
-            </div>
 
-            {/* Chat Area (System Messages) */}
-            <div className="chat-messages lobby-messages">
-              <div className="timestamp">Today 9:41 AM</div>
-              <div className="system-message">You joined Room {room.id}</div>
-              
-              {room.players.map(p => (
-                <div key={p.id} className="system-message">
-                  {p.name} {p.isHost ? 'is the host' : 'joined the room'}
-                </div>
-              ))}
 
-              {myPlayer?.isHost && (
-                <div className="system-action-box">
-                  <p>As the host, you control the chat wallpaper.</p>
-                  <div className="wallpaper-picker">
-                    <button className={room.wallpaper === 'default' ? 'active' : ''} onClick={() => changeWallpaper('default')}>Light</button>
-                    <button className={room.wallpaper === 'dark' ? 'active' : ''} onClick={() => changeWallpaper('dark')}>Dark</button>
-                    <button className={room.wallpaper === 'gradient' ? 'active' : ''} onClick={() => changeWallpaper('gradient')}>Vapor</button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Keyboard Area */}
-            <div className="ios-bottom-bar">
-               {myPlayer?.isHost ? (
-                 <button className="ios-primary-btn" onClick={startGame} disabled={room.players.length < 2}>
-                   {room.players.length < 2 ? 'Need 2+ players to start' : 'Start Game'}
-                 </button>
-               ) : (
-                 <div className="ios-waiting-text">Waiting for host to start...</div>
-               )}
-            </div>
+        {/* Action Buttons */}
+        <div className="action-buttons">
+          <button className="btn-primary" onClick={handleHost}>
+            Create Game <span>+</span>
+          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input 
+              type="text" 
+              className="text-input" 
+              placeholder="Code (ABCD)" 
+              value={roomCodeInput}
+              onChange={e => setRoomCodeInput(e.target.value.toUpperCase())}
+              style={{ width: '120px' }}
+              maxLength={4}
+            />
+            <button className="btn-secondary" style={{ flex: 1 }} onClick={handleJoin}>
+              Join Game <span>→</span>
+            </button>
           </div>
-        )}
+        </div>
 
-        {gameState === 'game' && room && (
-          <div className="ios-screen ios-chat">
-            {/* Header */}
-            <div className="chat-header">
-              <div className="chat-header-back">
-                <span className="chevron">‹</span>
-                <span className="back-text">{room.players.length}</span>
+        {/* How to Play */}
+        <div className="how-to-play">
+          <h3><MessageCircleQuestion size={18}/> How to Play</h3>
+          <div className="instruction-step">
+            <div className="step-num">1</div>
+            <div className="step-text">A random message is sent automatically.</div>
+          </div>
+          <div className="instruction-step">
+            <div className="step-num">2</div>
+            <div className="step-text">Everyone (except the host) replies.</div>
+          </div>
+          <div className="instruction-step">
+            <div className="step-num">3</div>
+            <div className="step-text">The host picks the funniest response.</div>
+          </div>
+          <div className="instruction-step">
+            <div className="step-num">4</div>
+            <div className="step-text">That player becomes the next judge!</div>
+          </div>
+        </div>
+
+
+      </div>
+    );
+  }
+
+  // Common Top Bar for Room
+  const topBar = (
+    <div className="game-top-bar">
+      <button className="icon-btn" style={{ width: 40, height: 40 }} onClick={leaveRoom}><ArrowLeft size={20} /></button>
+      <div className="round-indicator">
+        <div className="round-title">Round {room.roundCount + 1}</div>
+        <div className="round-dots">
+          {[0,1,2,3,4].map(i => (
+            <div key={i} className={`dot ${i <= room.roundCount ? 'active' : ''}`}></div>
+          ))}
+        </div>
+      </div>
+      <button className="btn-leave" onClick={leaveRoom}>Leave</button>
+    </div>
+  );
+
+  const judge = room.players[room.judgeIndex];
+  const amIJudge = myPlayer?.id === judge?.id;
+
+  if (room.status === 'lobby') {
+    return (
+      <div className="app-container">
+        {topBar}
+        <div className="section-title" style={{ justifyContent: 'center', margin: '40px 0 20px', fontSize: '1.2rem' }}>
+          Room Code: <strong style={{ color: 'var(--primary)', marginLeft: 8, fontSize: '1.5rem', letterSpacing: 2 }}>{room.id}</strong>
+        </div>
+        <div className="replies-list">
+          <div className="section-title">Players ({room.players.length}/12)</div>
+          {room.players.map(p => (
+            <div key={p.id} className="player-list-item">
+              <img src={p.avatar} alt="avatar" className="reply-avatar" />
+              <div className="reply-name" style={{ color: 'var(--text-main)', fontSize: '1.1rem', flex: 1 }}>
+                {p.name} {p.id === myPlayer?.id && '(You)'}
               </div>
-              <div className="chat-header-contact">
-                <div className="group-avatars">
-                  <div className="avatar-single">{room.players[room.judgeIndex]?.name.charAt(0).toUpperCase()}</div>
-                </div>
-                <div className="chat-name">{isJudge ? 'You (Judge)' : room.players[room.judgeIndex]?.name}</div>
-                <div className="chat-subtitle">Room {room.id}</div>
-              </div>
-              <div className="chat-header-right">
-                <svg viewBox="0 0 24 24" className="facetime-icon" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                  <rect x="1" y="5" width="15" height="14" rx="3" ry="3"></rect>
-                </svg>
-              </div>
+              {p.isHost && <Crown size={20} style={{ color: 'var(--accent-gold)' }}/>}
             </div>
-
-            {/* Chat Area */}
-            <div className="chat-messages">
-              <div className="timestamp">Today 9:41 AM</div>
-              
-              <div className="imessage-row received-row">
-                <div className="imessage received">
-                  {room.currentInbox}
-                </div>
-              </div>
-
-              {room.status === 'judging' && room.submissions.map((sub, idx) => (
-                <div key={idx} className="imessage-row sent-row judging-row" onClick={() => isJudge && pickWinner(sub)}>
-                  <div className="imessage sent">
-                    {sub.card}
-                  </div>
-                </div>
-              ))}
-
-              {room.status === 'playing' && room.submissions.map((sub, idx) => (
-                 <div key={idx} className="imessage-row sent-row">
-                   <div className="imessage sent pending">
-                     Delivered
-                   </div>
-                 </div>
-              ))}
-            </div>
-
-            {/* Custom Keyboard / Hand */}
-            <div className="ios-keyboard-area">
-              <div className="keyboard-predictive-bar">
-                {isJudge ? 'Tap a message above to pick the winner!' : 'Select a reply from your hand'}
-              </div>
-              
-              {!isJudge && room.status === 'playing' && !hasSubmitted && (
-                <div className="keyboard-hand">
-                  {myPlayer?.hand.map((card, idx) => (
-                    <div key={idx} className="hand-card" onClick={() => submitCard(card)}>
-                      {card}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!isJudge && room.status === 'playing' && hasSubmitted && (
-                <div className="keyboard-status">Waiting for others...</div>
-              )}
-
-              {isJudge && room.status === 'playing' && (
-                <div className="keyboard-status">Waiting for replies ({room.submissions.length}/{room.players.length - 1})</div>
-              )}
-            </div>
+          ))}
+        </div>
+        {myPlayer?.isHost && (
+          <div className="floating-action">
+            <button className="btn-gold" onClick={handleStartGame}>Start Game</button>
           </div>
         )}
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (room.status === 'playing') {
+    return (
+      <div className="app-container">
+        {topBar}
+        
+        {/* The Message */}
+        <div className="message-box">
+          <div className="message-header">
+            <div className="msg-icon"><MessageCircleQuestion fill="white" size={24}/></div>
+            <div>
+              <div className="msg-title">The Message</div>
+              <div className="msg-subtitle">Sent automatically</div>
+            </div>
+          </div>
+          <div className="msg-bubble">
+            {room.currentInbox}
+          </div>
+        </div>
+
+        {amIJudge ? (
+          <>
+            <div className="judge-header" style={{ marginTop: 40 }}>
+               <Clock className="crown-icon" style={{ filter: 'none', color: 'var(--primary)' }} />
+               <div className="judge-title">Waiting for replies...</div>
+               <div className="judge-subtitle">Everyone (except you) is replying<br/>to the message.</div>
+            </div>
+            
+            <div className="replies-list" style={{ marginTop: 32 }}>
+               <div className="section-title">
+                 <span>Players</span>
+                 <span>{room.submissions.length} / {room.players.length - 1}</span>
+               </div>
+               {room.players.filter(p => p.id !== judge.id).map(p => {
+                 const hasReplied = room.submissions.some(s => s.playerId === p.id);
+                 return (
+                   <div key={p.id} className="reply-card">
+                     <img src={p.avatar} alt="avatar" className="reply-avatar" />
+                     <div className="reply-content" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 48 }}>
+                       <div className="reply-name" style={{ color: 'var(--text-main)', margin: 0, fontSize: '1rem' }}>
+                         {p.name}
+                       </div>
+                       {hasReplied ? (
+                         <div className="status-replied">Replied <CheckCircle size={14}/></div>
+                       ) : (
+                         <div className="status-typing">Typing...</div>
+                       )}
+                     </div>
+                   </div>
+                 );
+               })}
+            </div>
+            <div className="floating-action">
+               <div className="wait-box">
+                 <span style={{ fontSize: '0.9rem' }}>You can't reply. You're the judge this round. 😜</span>
+               </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="section-title">
+              <span>Your Hand</span>
+            </div>
+            <div className="hand-container">
+              {myPlayer?.hand.map((card, i) => {
+                 const isSub = room.submissions.some(s => s.playerId === myPlayer.id);
+                 if (isSub) return null; // hide hand if submitted
+                 return (
+                   <div 
+                     key={i} 
+                     className={`hand-card ${selectedCard === card && !customReply ? 'selected' : ''}`}
+                     style={selectedCard === card && !customReply ? { border: '2px solid var(--primary)', background: 'rgba(157,60,243,0.1)' } : {}}
+                     onClick={() => { setSelectedCard(card); setCustomReply(''); }}
+                   >
+                     {card}
+                   </div>
+                 );
+              })}
+              
+              {!room.submissions.some(s => s.playerId === myPlayer?.id) && (
+                <div style={{ marginTop: '10px' }}>
+                  <div className="section-title" style={{ padding: '0 0 12px 0', justifyContent: 'center' }}>
+                    <span>— Or write your own —</span>
+                  </div>
+                  <input 
+                    type="text" 
+                    className="text-input" 
+                    placeholder="Type a custom reply..." 
+                    value={customReply}
+                    onChange={(e) => {
+                      setCustomReply(e.target.value);
+                      if (e.target.value) setSelectedCard(null);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="floating-action">
+              {room.submissions.some(s => s.playerId === myPlayer?.id) ? (
+                <div className="wait-box">Waiting for more replies...</div>
+              ) : (
+                <button className="btn-gold" onClick={submitCard} disabled={!selectedCard && !customReply.trim()}>
+                  Submit Reply
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (room.status === 'judging') {
+    return (
+      <div className="app-container">
+        {topBar}
+        <div className="judge-header">
+           <Crown className="crown-icon" color="var(--accent-gold)" fill="var(--accent-gold)" />
+           <div className="judge-title">Pick the funniest reply!</div>
+           <div className="judge-subtitle">Tap on the reply you think is the funniest.</div>
+        </div>
+
+        <div className="replies-list">
+          {room.submissions.map((sub, i) => {
+             const p = room.players.find(pl => pl.id === sub.playerId);
+             return (
+               <div 
+                 key={i} 
+                 className={`reply-card ${amIJudge ? 'selectable' : ''} ${selectedCard === sub.playerId ? 'selected' : ''}`}
+                 onClick={() => { if (amIJudge) setSelectedCard(sub.playerId) }}
+               >
+                 <div className="reply-content" style={{ paddingLeft: 12 }}>
+                   <div className="reply-text" style={{ fontSize: '1.1rem', fontWeight: 500 }}>{sub.card}</div>
+                 </div>
+               </div>
+             )
+          })}
+        </div>
+        
+        {amIJudge ? (
+          <div className="floating-action">
+             <button className="btn-gold" onClick={() => pickWinner(selectedCard!)} disabled={!selectedCard}>
+               Confirm Winner <Crown size={20} fill="black" />
+             </button>
+          </div>
+        ) : (
+          <div className="floating-action">
+             <div className="wait-box">Judge is picking a winner...</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (room.status === 'scoreboard') {
+     const winner = room.players.find(p => p.id === room.lastWinnerId);
+     return (
+       <div className="app-container">
+          {topBar}
+          <div className="winner-showcase">
+             <Crown className="crown-icon" style={{ position: 'absolute', top: -30, left: '50%', transform: 'translateX(-50%)', filter: 'none' }} color="var(--accent-gold)" fill="var(--accent-gold)"/>
+             <div className="winner-avatar-wrap">
+               <img src={winner?.avatar} alt="winner" className="winner-avatar" />
+               <div className="winner-badge">Winner!</div>
+             </div>
+             <div className="winner-subtitle">
+                <span>{winner?.name}'s</span> reply was the funniest! 🎉<br/>
+                {winner?.name} is the next judge.
+             </div>
+             
+             {myPlayer?.isHost && (
+               <div style={{ padding: '0 20px', marginBottom: 24 }}>
+                 <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={nextRound}>Next Round</button>
+               </div>
+             )}
+          </div>
+          
+          <div className="scoreboard">
+            <div className="score-header"><Trophy size={20} /> Scoreboard</div>
+            {[...room.players].sort((a,b) => b.score - a.score).map((p, i) => (
+              <div key={p.id} className="score-row">
+                 <div className="score-rank">{i + 1}</div>
+                 <img src={p.avatar} alt="av" className="score-avatar" />
+                 <div className="score-name">
+                   {p.name} {p.id === myPlayer?.id && '(You)'}
+                   {p.isHost && <Crown size={14} color="var(--accent-gold)"/>}
+                 </div>
+                 <div className="score-points">{p.score}</div>
+              </div>
+            ))}
+          </div>
+          
+
+       </div>
+     );
+  }
+
+  return null;
 }

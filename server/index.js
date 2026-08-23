@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { inboxCards, replyCards } = require('./cards');
+const { inboxCards, inboxData, generalReplies } = require('./cards');
 
 const app = express();
 app.use(cors());
@@ -51,6 +51,7 @@ io.on('connection', (socket) => {
     const player = {
       id: socket.id,
       name: playerName,
+      avatar: `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(playerName)}`,
       score: 0,
       hand: [],
       isHost: true
@@ -59,12 +60,12 @@ io.on('connection', (socket) => {
     rooms[roomCode] = {
       id: roomCode,
       players: [player],
-      status: 'lobby', // lobby, playing, judging
+      status: 'lobby', // lobby, playing, judging, scoreboard
       judgeIndex: 0,
       currentInbox: null,
       submissions: [], // { playerId, card }
       inboxDeck: shuffle([...inboxCards]),
-      replyDeck: shuffle([...replyCards]),
+      replyDeck: shuffle([...generalReplies]),
       roundCount: 0,
       wallpaper: 'default' // default, dark, purple, blue
     };
@@ -93,6 +94,7 @@ io.on('connection', (socket) => {
     const player = {
       id: socket.id,
       name: playerName,
+      avatar: `https://api.dicebear.com/7.x/micah/svg?seed=${encodeURIComponent(playerName)}`,
       score: 0,
       hand: [],
       isHost: false
@@ -113,13 +115,41 @@ io.on('connection', (socket) => {
   });
 
   const dealCards = (room) => {
+    const inboxDataMatch = inboxData.find(d => d.message === room.currentInbox);
+
+    // Create ONE shared pool of relevant cards, shuffled once
+    // Each player draws from this pool so no two players get the same relevant card
+    const sharedRelevantPool = inboxDataMatch ? shuffle([...inboxDataMatch.relevant]) : [];
+    
+    // Fresh wildcard deck for this round so no overlap
+    let wildcardDeck = shuffle([...generalReplies]);
+
     room.players.forEach(player => {
-      while (player.hand.length < 7) {
-        if (room.replyDeck.length === 0) {
-          room.replyDeck = shuffle([...replyCards]); // reshuffle if empty
-        }
-        player.hand.push(room.replyDeck.pop());
+      // Clear their hand every round
+      player.hand = [];
+      
+      // Draw 3 UNIQUE relevant cards from the shared pool (no other player will get these)
+      let relevantToDraw = 3;
+      while (relevantToDraw > 0 && sharedRelevantPool.length > 0) {
+        player.hand.push(sharedRelevantPool.pop());
+        relevantToDraw--;
       }
+
+      // Fill the rest of the hand (up to 5 cards) with wildcards
+      // Also ensure no wildcard duplicates another player's cards
+      while (player.hand.length < 5) {
+        if (wildcardDeck.length === 0) {
+          wildcardDeck = shuffle([...generalReplies]);
+        }
+        const card = wildcardDeck.pop();
+        // Skip if this card is already in this player's hand
+        if (!player.hand.includes(card)) {
+          player.hand.push(card);
+        }
+      }
+      
+      // Shuffle the hand so relevant cards aren't always at the front
+      player.hand = shuffle(player.hand);
     });
   };
 
@@ -130,6 +160,7 @@ io.on('connection', (socket) => {
     room.currentInbox = room.inboxDeck.pop();
     room.submissions = [];
     room.status = 'playing';
+    room.lastWinnerId = null;
     dealCards(room);
     io.to(room.id).emit('room_update', room);
   };
@@ -180,18 +211,18 @@ io.on('connection', (socket) => {
       winner.score += 1;
     }
 
-    io.to(roomCode).emit('round_winner', {
-      winningSubmission,
-      winnerName: winner ? winner.name : 'Unknown'
-    });
+    room.status = 'scoreboard';
+    room.lastWinnerId = winner ? winner.id : null;
+    io.to(roomCode).emit('room_update', room);
+  });
 
-    // Wait 5 seconds, then start next round
-    setTimeout(() => {
-      // Next judge
-      room.judgeIndex = (room.judgeIndex + 1) % room.players.length;
-      room.roundCount++;
-      startRound(room);
-    }, 5000);
+  socket.on('next_round', (roomCode) => {
+    const room = rooms[roomCode];
+    if (room && room.players[0].id === socket.id && room.status === 'scoreboard') {
+       room.judgeIndex = (room.judgeIndex + 1) % room.players.length;
+       room.roundCount++;
+       startRound(room);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -222,6 +253,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3002;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on port ${PORT} at 0.0.0.0`);
 });
