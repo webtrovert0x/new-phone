@@ -18,7 +18,7 @@ interface Player {
 interface Room {
   id: string;
   players: Player[];
-  status: 'lobby' | 'playing' | 'judging' | 'scoreboard';
+  status: 'lobby' | 'playing' | 'judging' | 'scoreboard' | 'game_over';
   judgeIndex: number;
   currentInbox: string | null;
   submissions: { playerId: string; card: string }[];
@@ -445,6 +445,50 @@ export default function App() {
 
        </div>
      );
+  }
+
+  if (room.status === 'game_over') {
+    const sortedPlayers = [...room.players].sort((a, b) => b.score - a.score);
+    const champion = sortedPlayers[0];
+    return (
+      <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: 20 }}>
+        <div className="judge-header" style={{ marginBottom: 0 }}>
+          <Trophy size={60} color="var(--accent-gold)" style={{ filter: 'drop-shadow(0 0 20px rgba(255,190,11,0.5))', marginBottom: 16 }} />
+          <div className="judge-title" style={{ fontSize: '2rem' }}>Game Over!</div>
+          <div className="judge-subtitle" style={{ marginTop: 8 }}>10 rounds complete</div>
+        </div>
+
+        <div className="winner-showcase" style={{ margin: '30px 0 20px' }}>
+          <div className="winner-avatar-wrap">
+            <img src={champion?.avatar} alt="champion" className="winner-avatar" />
+            <div className="winner-badge">🏆 Champion</div>
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: 16 }}>{champion?.name}</div>
+          <div style={{ color: 'var(--accent-gold)', fontSize: '1.1rem', fontWeight: 700 }}>{champion?.score} points</div>
+        </div>
+
+        <div className="scoreboard" style={{ width: '100%', borderRadius: 24 }}>
+          <div className="score-header"><Trophy size={20} /> Final Standings</div>
+          {sortedPlayers.map((p, i) => (
+            <div key={p.id} className="score-row">
+              <div className="score-rank" style={i === 0 ? { color: 'var(--accent-gold)', fontWeight: 800 } : {}}>{i + 1}</div>
+              <img src={p.avatar} alt="av" className="score-avatar" />
+              <div className="score-name">
+                {p.name} {p.id === myPlayer?.id && '(You)'}
+                {i === 0 && <Crown size={14} color="var(--accent-gold)" fill="var(--accent-gold)" />}
+              </div>
+              <div className="score-points" style={i === 0 ? { color: 'var(--accent-gold)' } : {}}>{p.score}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: '24px 0', width: '100%' }}>
+          <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={leaveRoom}>
+            Play Again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return null;

@@ -221,7 +221,14 @@ io.on('connection', (socket) => {
     if (room && room.players[0].id === socket.id && room.status === 'scoreboard') {
        room.judgeIndex = (room.judgeIndex + 1) % room.players.length;
        room.roundCount++;
-       startRound(room);
+       
+       // End the game after 10 rounds
+       if (room.roundCount >= 10) {
+         room.status = 'game_over';
+         io.to(roomCode).emit('room_update', room);
+       } else {
+         startRound(room);
+       }
     }
   });
 
