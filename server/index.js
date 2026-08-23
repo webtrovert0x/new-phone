@@ -216,6 +216,16 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('room_update', room);
   });
 
+  socket.on('reroll_round', (roomCode) => {
+    const room = rooms[roomCode];
+    if (!room || (room.status !== 'judging' && room.status !== 'playing')) return;
+
+    const judgeId = room.players[room.judgeIndex].id;
+    if (socket.id !== judgeId) return; // Only judge can reroll
+
+    startRound(room);
+  });
+
   socket.on('next_round', (roomCode) => {
     const room = rooms[roomCode];
     if (room && room.players[0].id === socket.id && room.status === 'scoreboard') {

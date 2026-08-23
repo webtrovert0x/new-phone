@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Home, Gamepad2, Trophy, User, ArrowLeft, Settings, MessageCircleQuestion, Crown, Heart, Clock, CheckCircle } from 'lucide-react';
+import { Home, Gamepad2, Trophy, User, ArrowLeft, Settings, MessageCircleQuestion, Crown, Heart, Clock, CheckCircle, RotateCcw } from 'lucide-react';
 
 const socket: Socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002');
 
@@ -98,6 +98,14 @@ export default function App() {
       if (submission) {
         socket.emit('pick_winner', { roomCode: room.id, winningSubmission: submission });
       }
+    }
+  };
+
+  const handleReroll = () => {
+    if (room && amIJudge) {
+      socket.emit('reroll_round', room.id);
+      setSelectedCard(null);
+      setCustomReply('');
     }
   };
 
@@ -301,10 +309,17 @@ export default function App() {
                  );
                })}
             </div>
-            <div className="floating-action">
+            <div className="floating-action" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                <div className="wait-box">
-                 <span style={{ fontSize: '0.9rem' }}>You can't reply. You're the judge this round. 😜</span>
+                 <span style={{ fontSize: '0.9rem' }}>You're the judge this round. 😜</span>
                </div>
+               <button 
+                 className="btn-secondary" 
+                 style={{ justifyContent: 'center', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', fontSize: '0.95rem', padding: '14px' }}
+                 onClick={handleReroll}
+               >
+                 <RotateCcw size={16} style={{ marginRight: 8 }} /> Re-roll Prompt
+               </button>
             </div>
           </>
         ) : (
@@ -390,9 +405,16 @@ export default function App() {
         </div>
         
         {amIJudge ? (
-          <div className="floating-action">
+          <div className="floating-action" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
              <button className="btn-gold" onClick={() => pickWinner(selectedCard!)} disabled={!selectedCard}>
                Confirm Winner <Crown size={20} fill="black" />
+             </button>
+             <button 
+               className="btn-secondary" 
+               style={{ justifyContent: 'center', background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', fontSize: '0.95rem', padding: '14px' }}
+               onClick={handleReroll}
+             >
+               <RotateCcw size={16} style={{ marginRight: 8 }} /> None are funny? Re-roll Round
              </button>
           </div>
         ) : (
