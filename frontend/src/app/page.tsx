@@ -3,16 +3,24 @@ import { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Home, Gamepad2, Trophy, User, ArrowLeft, Settings, MessageCircleQuestion, Crown, Heart, Clock, CheckCircle, RotateCcw } from 'lucide-react';
 
-const socket: Socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002');
+const socket: Socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3002', {
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 20000
+});
 
 // Types
 interface Player {
   id: string;
+  socketId?: string;
   name: string;
   avatar: string;
   score: number;
   hand: string[];
   isHost: boolean;
+  online?: boolean;
 }
 
 interface Room {
@@ -27,6 +35,7 @@ interface Room {
 }
 
 export default function App() {
+  const [playerId, setPlayerId] = useState<string>('');
   const [playerName, setPlayerName] = useState('');
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState('');
@@ -36,11 +45,52 @@ export default function App() {
   
   // local state
   const [myPlayer, setMyPlayer] = useState<Player | null>(null);
-
   const [isConnected, setIsConnected] = useState(socket.connected);
 
+  // Initialize persistent player ID and attempt seamless session restore
   useEffect(() => {
-    const onConnect = () => setIsConnected(true);
+    if (typeof window !== 'undefined') {
+      let storedId = localStorage.getItem('who_dis_player_id');
+      if (!storedId) {
+        storedId = 'p_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+        localStorage.setItem('who_dis_player_id', storedId);
+      }
+      setPlayerId(storedId);
+
+      const savedName = localStorage.getItem('who_dis_player_name');
+      if (savedName) setPlayerName(savedName);
+
+      const savedRoom = localStorage.getItem('who_dis_room_code');
+      if (savedRoom && storedId) {
+        socket.emit('reconnect_room', { roomCode: savedRoom, playerId: storedId }, (res: any) => {
+          if (res?.success && res.room) {
+            setRoom(res.room);
+            const me = res.room.players.find((p: Player) => p.id === storedId);
+            if (me) setMyPlayer(me);
+          } else {
+            localStorage.removeItem('who_dis_room_code');
+          }
+        });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const onConnect = () => {
+      setIsConnected(true);
+      const storedId = localStorage.getItem('who_dis_player_id') || playerId;
+      const savedRoom = localStorage.getItem('who_dis_room_code');
+      if (savedRoom && storedId) {
+        socket.emit('reconnect_room', { roomCode: savedRoom, playerId: storedId }, (res: any) => {
+          if (res?.success && res.room) {
+            setRoom(res.room);
+            const me = res.room.players.find((p: Player) => p.id === storedId);
+            if (me) setMyPlayer(me);
+          }
+        });
+      }
+    };
+
     const onDisconnect = () => setIsConnected(false);
     
     socket.on('connect', onConnect);
@@ -48,23 +98,52 @@ export default function App() {
 
     socket.on('room_update', (updatedRoom: Room) => {
       setRoom(updatedRoom);
-      const me = updatedRoom.players.find(p => p.id === socket.id);
+      const storedId = typeof window !== 'undefined' ? (localStorage.getItem('who_dis_player_id') || playerId) : playerId;
+      const me = updatedRoom.players.find(p => (storedId && p.id === storedId) || p.socketId === socket.id || p.id === socket.id);
       if (me) setMyPlayer(me);
     });
+
+    // Handle tab switching / browser minimize wake up
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const storedId = localStorage.getItem('who_dis_player_id') || playerId;
+        const savedRoom = localStorage.getItem('who_dis_room_code');
+        if (savedRoom && storedId) {
+          socket.emit('reconnect_room', { roomCode: savedRoom, playerId: storedId }, (res: any) => {
+            if (res?.success && res.room) {
+              setRoom(res.room);
+              const me = res.room.players.find((p: Player) => p.id === storedId);
+              if (me) setMyPlayer(me);
+            }
+          });
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('room_update');
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, []);
+  }, [playerId]);
 
   const handleHost = () => {
     if (!isConnected) return setError('Not connected to server yet! Try refreshing.');
     if (!playerName) return setError('Please enter your name first.');
-    console.log('Requesting to create room for', playerName);
-    socket.emit('create_room', playerName, (res: any) => {
-      if (!res.success) setError('Failed to create room');
+    const storedId = localStorage.getItem('who_dis_player_id') || playerId;
+    localStorage.setItem('who_dis_player_name', playerName);
+    
+    socket.emit('create_room', { playerName, playerId: storedId }, (res: any) => {
+      if (!res.success) {
+        setError('Failed to create room');
+      } else {
+        localStorage.setItem('who_dis_room_code', res.roomCode);
+      }
     });
   };
 
@@ -72,8 +151,15 @@ export default function App() {
     if (!isConnected) return setError('Not connected to server yet! Try refreshing.');
     if (!playerName) return setError('Please enter your name first.');
     if (roomCodeInput.length !== 4) return setError('Enter 4-letter code.');
-    socket.emit('join_room', { roomCode: roomCodeInput, playerName }, (res: any) => {
-      if (!res.success) setError(res.message);
+    const storedId = localStorage.getItem('who_dis_player_id') || playerId;
+    localStorage.setItem('who_dis_player_name', playerName);
+    
+    socket.emit('join_room', { roomCode: roomCodeInput, playerName, playerId: storedId }, (res: any) => {
+      if (!res.success) {
+        setError(res.message);
+      } else {
+        localStorage.setItem('who_dis_room_code', res.roomCode);
+      }
     });
   };
 
@@ -92,9 +178,9 @@ export default function App() {
     }
   };
 
-  const pickWinner = (playerId: string) => {
-    if (room && myPlayer?.id === room.players[room.judgeIndex].id) {
-      const submission = room.submissions.find(s => s.playerId === playerId);
+  const pickWinner = (playerIdToPick: string) => {
+    if (room && myPlayer?.id === room.players[room.judgeIndex]?.id) {
+      const submission = room.submissions.find(s => s.playerId === playerIdToPick);
       if (submission) {
         socket.emit('pick_winner', { roomCode: room.id, winningSubmission: submission });
       }
@@ -116,9 +202,15 @@ export default function App() {
   };
 
   const leaveRoom = () => {
+    if (room) {
+      socket.emit('leave_room', { roomCode: room.id });
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('who_dis_room_code');
+    }
     setRoom(null);
-    socket.emit('disconnect'); 
-    window.location.reload();
+    setSelectedCard(null);
+    setCustomReply('');
   };
 
   // --- RENDERING ---
@@ -162,8 +254,6 @@ export default function App() {
           />
         </div>
 
-
-
         {/* Action Buttons */}
         <div className="action-buttons">
           <button className="btn-primary" onClick={handleHost}>
@@ -194,19 +284,17 @@ export default function App() {
           </div>
           <div className="instruction-step">
             <div className="step-num">2</div>
-            <div className="step-text">Everyone (except the host) replies.</div>
+            <div className="step-text">Everyone (except the judge) replies.</div>
           </div>
           <div className="instruction-step">
             <div className="step-num">3</div>
-            <div className="step-text">The host picks the funniest response.</div>
+            <div className="step-text">The judge picks the funniest response.</div>
           </div>
           <div className="instruction-step">
             <div className="step-num">4</div>
-            <div className="step-text">That player becomes the next judge!</div>
+            <div className="step-text">First to 10 rounds wins the crown!</div>
           </div>
         </div>
-
-
       </div>
     );
   }
@@ -218,7 +306,7 @@ export default function App() {
       <div className="round-indicator">
         <div className="round-title">Round {room.roundCount + 1}</div>
         <div className="round-dots">
-          {[0,1,2,3,4].map(i => (
+          {[0,1,2,3,4,5,6,7,8,9].map(i => (
             <div key={i} className={`dot ${i <= room.roundCount ? 'active' : ''}`}></div>
           ))}
         </div>
@@ -240,10 +328,10 @@ export default function App() {
         <div className="replies-list">
           <div className="section-title">Players ({room.players.length}/12)</div>
           {room.players.map(p => (
-            <div key={p.id} className="player-list-item">
+            <div key={p.id} className="player-list-item" style={{ opacity: p.online === false ? 0.6 : 1 }}>
               <img src={p.avatar} alt="avatar" className="reply-avatar" />
               <div className="reply-name" style={{ color: 'var(--text-main)', fontSize: '1.1rem', flex: 1 }}>
-                {p.name} {p.id === myPlayer?.id && '(You)'}
+                {p.name} {p.id === myPlayer?.id && '(You)'} {p.online === false && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>(Away)</span>}
               </div>
               {p.isHost && <Crown size={20} style={{ color: 'var(--accent-gold)' }}/>}
             </div>
@@ -290,14 +378,14 @@ export default function App() {
                  <span>Players</span>
                  <span>{room.submissions.length} / {room.players.length - 1}</span>
                </div>
-               {room.players.filter(p => p.id !== judge.id).map(p => {
+               {room.players.filter(p => p.id !== judge?.id).map(p => {
                  const hasReplied = room.submissions.some(s => s.playerId === p.id);
                  return (
-                   <div key={p.id} className="reply-card">
+                   <div key={p.id} className="reply-card" style={{ opacity: p.online === false ? 0.6 : 1 }}>
                      <img src={p.avatar} alt="avatar" className="reply-avatar" />
                      <div className="reply-content" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 48 }}>
                        <div className="reply-name" style={{ color: 'var(--text-main)', margin: 0, fontSize: '1rem' }}>
-                         {p.name}
+                         {p.name} {p.online === false && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(Away)</span>}
                        </div>
                        {hasReplied ? (
                          <div className="status-replied">Replied <CheckCircle size={14}/></div>
@@ -389,7 +477,6 @@ export default function App() {
 
         <div className="replies-list">
           {room.submissions.map((sub, i) => {
-             const p = room.players.find(pl => pl.id === sub.playerId);
              return (
                <div 
                  key={i} 
@@ -463,8 +550,6 @@ export default function App() {
               </div>
             ))}
           </div>
-          
-
        </div>
      );
   }
